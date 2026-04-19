@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Skillora</title>
+    <style>
+        :root { --accent: #3b82f6; --bg: #000; --card: #0a0a0a; --border: #1a1a1a; }
+        body { margin: 0; background: var(--bg); color: #fff; font-family: system-ui; height: 100vh; overflow: hidden; }
+        .container { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
+        
+        /* HEADER */
+        header { position: absolute; top: 40px; font-weight: 900; letter-spacing: 5px; color: var(--accent); }
+
+        /* INPUT BOX */
+        .box { width: 100%; max-width: 400px; text-align: center; }
+        input { width: 100%; padding: 20px; background: var(--card); border: 1px solid var(--border); border-radius: 15px; color: #fff; margin-bottom: 10px; outline: none; }
+        .btn { width: 100%; padding: 18px; border-radius: 15px; border: none; background: #fff; color: #000; font-weight: 800; cursor: pointer; }
+
+        /* COACH ICON - FIXED VISIBILITY */
+        .coach-icon {
+            position: fixed; bottom: 30px; right: 30px; width: 60px; height: 60px;
+            background: var(--accent); border-radius: 20px; display: flex;
+            align-items: center; justify-content: center; z-index: 1000;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        /* ROADMAP */
+        #roadmap { display: none; width: 100%; max-width: 400px; }
+        .slide { background: var(--card); border: 1px solid var(--border); padding: 30px; border-radius: 25px; min-height: 350px; }
+        .day { color: var(--accent); font-size: 12px; font-weight: 900; margin-bottom: 5px; }
+
+        /* SIDE CHAT */
+        #panel { position: fixed; top: 0; right: -100%; width: 100%; max-width: 380px; height: 100%; background: #000; z-index: 2000; transition: 0.4s; border-left: 1px solid var(--border); }
+        #panel.open { right: 0; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+<header>SKILLORA</header>
+
+<div class="container">
+    <div id="hero" class="box">
+        <input id="skillInput" placeholder="Enter a skill..." onkeypress="if(event.key==='Enter') forge()">
+        <button class="btn" onclick="forge()">FORGE PLAN</button>
+    </div>
+
+    <div id="loader" class="hidden">Forging...</div>
+
+    <div id="roadmap">
+        <div id="content" class="slide"></div>
+        <div style="display:flex; justify-content:space-between; margin-top:20px;">
+            <button onclick="location.reload()" style="background:none; border:none; color:#555;">Reset</button>
+            <div id="prog">1 / 7</div>
+        </div>
+    </div>
+</div>
+
+<div class="coach-icon" onclick="toggleCoach()">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+</div>
+
+<div id="panel">
+    <div style="padding: 20px; display: flex; justify-content: space-between;">
+        <b>COACH</b>
+        <b onclick="toggleCoach()">CLOSE</b>
+    </div>
+    <div id="chatBox" style="height: 70%; overflow-y: auto; padding: 20px;"></div>
+    <div style="padding: 20px;">
+        <input id="chatInput" placeholder="Ask coach..." onkeypress="if(event.key==='Enter') ask()">
+    </div>
+</div>
+
+<script>
+    let activeSkill = "";
+    function toggleCoach() { document.getElementById("panel").classList.toggle("open"); }
+
+    async function forge() {
+        const val = document.getElementById("skillInput").value;
+        if(!val) return;
+        activeSkill = val;
+
+        document.getElementById("hero").classList.add("hidden");
+        document.getElementById("loader").classList.remove("hidden");
+
+        const res = await fetch("/api/roadmap", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ skill: activeSkill })
+        });
+        const data = await res.json();
+        
+        if(data.error) {
+            alert(data.error);
+            location.reload();
+            return;
+        }
+
+        const firstDay = data.roadmap[0];
+        document.getElementById("content").innerHTML = `
+            <div class="day">${firstDay.day}</div>
+            <h2>${firstDay.title}</h2>
+            ${firstDay.tasks.map(t => `<p>• ${t}</p>`).join('')}
+        `;
+
+        document.getElementById("loader").classList.add("hidden");
+        document.getElementById("roadmap").style.display = "block";
+    }
+
+    async function ask() {
+        const box = document.getElementById("chatInput");
+        const chat = document.getElementById("chatBox");
+        const msg = box.value;
+        if(!msg) return;
+        chat.innerHTML += `<div>You: ${msg}</div>`;
+        box.value = "";
+        
+        const res = await fetch("/api/coach", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message: msg, skill: activeSkill })
+        });
+        const d = await res.json();
+        chat.innerHTML += `<div style="color:#3b82f6">Coach: ${d.reply}</div>`;
+    }
+</script>
+</body>
+</html>
