@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Skillora | Forge Your Path</title>
+<style>
+  :root { --accent: #3b82f6; --bg: #000; --text: #fff; }
+  * { box-sizing: border-box; font-family: -apple-system, system-ui, sans-serif; }
+  body { margin: 0; background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+  
+  /* UI ELEMENTS */
+  header { padding: 20px; text-align: center; font-size: 28px; font-weight: 900; }
+  .container { flex: 1; position: relative; padding: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+
+  /* SEARCH BOX */
+  #hero { width: 100%; max-width: 400px; text-align: center; }
+  input { width: 100%; padding: 16px; background: #111; color: #fff; border: 1px solid #222; border-radius: 12px; margin-bottom: 10px; outline: none; }
+  .btn { width: 100%; padding: 16px; border-radius: 12px; border: none; font-weight: 700; cursor: pointer; background: #fff; color: #000; }
+
+  /* ROADMAP CAROUSEL */
+  #roadmap { display: none; width: 100%; max-width: 400px; }
+  .view { overflow: hidden; border-radius: 20px; border: 1px solid #222; background: #050505; }
+  .track { display: flex; transition: 0.5s ease; }
+  .slide { min-width: 100%; padding: 25px; min-height: 300px; }
+  
+  .task { background: #111; padding: 12px; border-radius: 10px; margin-bottom: 8px; font-size: 14px; border: 1px solid #1a1a1a; }
+  .nav { display: flex; justify-content: space-between; margin-top: 20px; align-items: center; width: 100%; }
+  .arr { width: 45px; height: 45px; background: #111; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+
+  /* CHAT PANEL */
+  .ai-trigger { position: fixed; bottom: 20px; right: 20px; width: 55px; height: 55px; background: var(--accent); border-radius: 15px; display: flex; align-items: center; justify-content: center; font-size: 24px; z-index: 100; }
+  .panel { position: fixed; top: 0; right: -100%; width: 100%; max-width: 350px; height: 100vh; background: #000; border-left: 1px solid #111; z-index: 1000; transition: 0.3s; display: flex; flex-direction: column; }
+  .panel.open { right: 0; }
+  .chat { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 10px; }
+  .msg { padding: 12px; border-radius: 12px; font-size: 14px; max-width: 80%; }
+  .u { background: var(--accent); align-self: flex-end; }
+  .a { background: #111; align-self: flex-start; }
+
+  #loader { display: none; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<header>Skillora</header>
+
+<div class="container">
+  <div id="hero">
+    <p style="opacity: 0.6; margin-bottom: 20px;">What do you want to master today?</p>
+    <input id="skillInput" placeholder="e.g. Graphic Design" onkeypress="if(event.key==='Enter') forge()">
+    <button class="btn" onclick="forge()">GENERATE PLAN</button>
+  </div>
+
+  <div id="loader">Processing...</div>
+
+  <div id="roadmap">
+    <div class="view">
+      <div id="track" class="track"></div>
+    </div>
+    <div class="nav">
+      <div class="arr" onclick="slide(-1)">←</div>
+      <div id="prog">1 / 7</div>
+      <div class="arr" onclick="slide(1)">→</div>
+    </div>
+    <button onclick="location.reload()" style="background:none; border:none; color:#333; margin-top:20px; width:100%; font-size:12px;">Start New Forge</button>
+  </div>
+</div>
+
+<div class="ai-trigger" onclick="toggle()">💬</div>
+
+<div id="panel" class="panel">
+  <div style="padding: 20px; border-bottom: 1px solid #111; display: flex; justify-content: space-between;">
+    <b>AI Coach</b>
+    <span onclick="toggle()" style="cursor:pointer">CLOSE</span>
+  </div>
+  <div id="chatBox" class="chat"></div>
+  <div style="padding: 20px;">
+    <input id="coachInput" placeholder="Ask a question..." onkeypress="if(event.key==='Enter') askCoach()">
+  </div>
+</div>
+
+<script>
+  let currentStep = 0, totalSteps = 0, activeSkill = "";
+
+  async function forge() {
+    const val = document.getElementById("skillInput").value;
+    if (!val) return;
+    activeSkill = val;
+
+    document.getElementById("hero").classList.add("hidden");
+    document.getElementById("loader").style.display = "block";
+
+    try {
+      const res = await fetch("/api/roadmap", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ skill: activeSkill })
+      });
+      const data = await res.json();
+
+      if (!data.roadmap || data.roadmap.length === 0) throw new Error(data.error || "Failed to forge.");
+
+      totalSteps = data.roadmap.length;
+      const track = document.getElementById("track");
+      track.innerHTML = "";
+
+      data.roadmap.forEach(day => {
+        const s = document.createElement("div");
+        s.className = "slide";
+        s.innerHTML = `<h3 style="color:#3b82f6">${day.day}</h3><h4>${day.title}</h4>` + 
+                      day.tasks.map(t => `<div class="task">${t}</div>`).join('');
+        track.appendChild(s);
+      });
+
+      document.getElementById("loader").style.display = "none";
+      document.getElementById("roadmap").style.display = "block";
+      updateNav();
+    } catch (e) {
+      alert(e.message);
+      location.reload();
+    }
+  }
+
+  function slide(dir) {
+    currentStep = Math.max(0, Math.min(totalSteps - 1, currentStep + dir));
+    document.getElementById("track").style.transform = `translateX(-${currentStep * 100}%)`;
+    updateNav();
+  }
+
+  function updateNav() { document.getElementById("prog").innerText = `${currentStep + 1} / ${totalSteps}`; }
+  function toggle() { document.getElementById("panel").classList.toggle("open"); }
+
+  async function askCoach() {
+    const box = document.getElementById("coachInput");
+    const chat = document.getElementById("chatBox");
+    const msg = box.value;
+    if(!msg) return;
+
+    chat.innerHTML += `<div class="msg u">${msg}</div>`;
+    box.value = "";
+
+    const res = await fetch("/api/coach", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: msg, skill: activeSkill })
+    });
+    const d = await res.json();
+    chat.innerHTML += `<div class="msg a">${d.reply}</div>`;
+    chat.scrollTop = chat.scrollHeight;
+  }
+</script>
+</body>
+</html>
