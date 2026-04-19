@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Skillora</title>
+    <style>
+        body { background: #000; color: #fff; font-family: sans-serif; margin: 0; padding: 20px; text-align: center; }
+        .box { border: 1px solid #333; padding: 20px; border-radius: 10px; margin-top: 50px; }
+        input { width: 100%; padding: 15px; margin-bottom: 10px; border-radius: 5px; border: none; box-sizing: border-box; }
+        button { width: 100%; padding: 15px; background: #3b82f6; color: #fff; border: none; border-radius: 5px; font-weight: bold; }
+        #roadmap { display: none; text-align: left; margin-top: 30px; }
+        .slide { border: 1px solid #3b82f6; padding: 15px; border-radius: 10px; margin-bottom: 10px; }
+        .task { background: #111; padding: 10px; margin: 5px 0; border-radius: 5px; font-size: 14px; }
+        #loader { display: none; margin: 20px; color: #3b82f6; }
+    </style>
+</head>
+<body>
+
+    <h1>Skillora</h1>
+
+    <div id="hero" class="box">
+        <p>What do you want to learn?</p>
+        <input id="skillInput" type="text" placeholder="e.g. Python">
+        <button onclick="forge()">FORGE PLAN</button>
+    </div>
+
+    <div id="loader">Forging your path...</div>
+
+    <div id="roadmap">
+        <div id="content"></div>
+        <button onclick="location.reload()" style="background:#222; margin-top:20px;">START OVER</button>
+    </div>
+
+    <script>
+        async function forge() {
+            const skill = document.getElementById("skillInput").value;
+            if (!skill) return;
+
+            document.getElementById("hero").style.display = "none";
+            document.getElementById("loader").style.display = "block";
+
+            try {
+                const res = await fetch("/api/roadmap", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ skill: skill })
+                });
+                const data = await res.json();
+
+                if (!data.roadmap || data.roadmap.length === 0) throw new Error("AI blocked this topic for safety.");
+
+                const container = document.getElementById("content");
+                container.innerHTML = "";
+
+                data.roadmap.forEach(day => {
+                    const d = document.createElement("div");
+                    d.className = "slide";
+                    d.innerHTML = `<h3>${day.day}: ${day.title}</h3>`;
+                    day.tasks.forEach(t => {
+                        d.innerHTML += `<div class="task">${t}</div>`;
+                    });
+                    container.appendChild(d);
+                });
+
+                document.getElementById("loader").style.display = "none";
+                document.getElementById("roadmap").style.display = "block";
+            } catch (e) {
+                alert("Notice: " + e.message);
+                location.reload();
+            }
+        }
+    </script>
+</body>
+</html>
